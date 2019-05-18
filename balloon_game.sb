@@ -1,0 +1,194 @@
+' window settings
+width = 640
+height = 480
+
+' global variables
+true = "true"
+false = "false"
+run = true
+score = 0
+interval = 1000/60
+up = 0
+down = 1
+left = 2
+right = 3
+
+' player variables
+player_direction = -1
+player_d = 2
+player_height = 50
+player_width = 50
+player_x = width - 100
+player_y = 480/2 - player_height/2
+
+' balloon variables
+balloon_direction = -1
+balloon_d = 2
+balloon_height = 75
+balloon_width = 75
+balloon_x = 100
+balloon_y = 480/2 - balloon_height/2
+
+' bullet variables
+bullet_d = balloon_d * 1.5
+bullet_width = 30
+bullet_height = 30
+bullet_x = -100
+bullet_y = -100
+
+Timer.Interval = interval
+Timer.Tick = Game
+
+SetupWindow()
+
+' set up shapes
+GraphicsWindow.BrushColor = "black"
+player = Shapes.AddRectangle(player_width, player_height)
+GraphicsWindow.BrushColor = "red"
+balloon = Shapes.AddEllipse(balloon_width, balloon_height)
+GraphicsWindow.BrushColor = "gray"
+bullet = Shapes.AddRectangle(bullet_width, bullet_height)
+GraphicsWindow.BrushColor = "black"
+score_text = Shapes.AddText(score)
+score_pre = Shapes.AddText("Missed shots:")
+Shapes.Move(score_text, width - 100, height - 100)
+Shapes.Move(score_pre, width - 280, height - 100)
+Shapes.HideShape(score_text)
+Shapes.HideShape(score_pre)
+
+' game loop
+Sub Game
+  If (run) Then
+    MovePlayer()
+    MoveBalloon()
+    MoveBullet()
+  EndIf
+  DrawPlayer()
+  DrawBalloon()
+  DrawBullet()
+  GUI()
+  CheckWin()
+EndSub
+
+' change the player coordinates based on the direction enum
+Sub MovePlayer
+  If (direction = up) Then
+    player_y = player_y - player_d
+  ElseIf (direction = down) Then
+    player_y = player_y + player_d
+  ElseIf (direction = left) Then
+    player_x = player_x - player_d
+  ElseIf (direction = right) Then
+    player_x = player_x + player_d
+  EndIf
+EndSub
+
+Sub DrawPlayer
+  Shapes.Move(player, player_x, player_y)
+  Shapes.ShowShape(player)
+EndSub
+
+Sub MoveBalloon
+  ' generate a random chance to change direction
+  ' if there was a 50% chance to change direction, the balloon would jitter around too much
+  direction_change = Math.GetRandomNumber(30)
+  If (direction_change = 1) Then
+    balloon_direction = Math.GetRandomNumber(2) - 1
+  EndIf
+  If (balloon_y >= height - balloon_height) Then
+    balloon_direction = up
+  ElseIf (balloon_y <= 0) Then
+    balloon_direction = down
+  EndIf
+  If (balloon_direction = down) Then
+    balloon_y = balloon_y + balloon_d
+  Else
+    balloon_y = balloon_y - balloon_d
+  EndIf
+EndSub
+
+Sub DrawBalloon
+  Shapes.Move(balloon, balloon_x, balloon_y)
+  Shapes.ShowShape(balloon)
+EndSub
+
+Sub ShootBullet
+  ' -100, -100 is the bullet's position when it is not being shot
+  If (bullet_x = -100) Then
+    bullet_x = player_x - bullet_width
+    bullet_y = player_y + player_height/2 - bullet_height/2
+  EndIf
+EndSub
+
+Sub MoveBullet
+  If (bullet_x >= -bullet_width) Then
+    bullet_x = bullet_x - bullet_d
+  ' if the bullet is at the starting position we don't need to reset it
+  ElseIf (bullet_x <= -bullet_width) And (bullet_x <> -100) Then
+    bullet_x = -100
+    bullet_y = -100
+    score = score + 1
+  EndIf
+EndSub
+
+Sub DrawBullet
+  Shapes.Move(bullet, bullet_x, bullet_y)
+  Shapes.ShowShape(bullet)
+EndSub
+
+Sub GUI
+  Shapes.SetText(score_text, score)
+EndSub
+
+Sub CheckWin
+  ' we check the collision based on whether the centre of the bullet is inside the balloon
+  bullet_centre_x = bullet_x + bullet_width/2
+  bullet_centre_y = bullet_y + bullet_height/2
+  balloon_centre_x = balloon_x + balloon_width/2
+  balloon_centre_y = balloon_y + balloon_height/2
+  x = balloon_centre_x - bullet_centre_x
+  y = balloon_centre_y - bullet_centre_y
+  radius = balloon_width/2
+  distance = Math.SquareRoot(x*x + y*y)
+  If (distance <= radius) Then
+    run = false
+    bullet_x = -100
+    bullet_y = -100
+    Shapes.ShowShape(score_text)
+    Shapes.ShowShape(score_pre)
+  EndIf
+EndSub
+
+Sub SetupWindow
+  GraphicsWindow.Width = width
+  GraphicsWindow.Height = height
+  ' bind the keyboard event functions
+  GraphicsWindow.KeyDown = OnKeyDown
+  GraphicsWindow.KeyUp = OnKeyUp
+  
+  GraphicsWindow.FontName = "Arial"
+  GraphicsWindow.FontSize = 25
+EndSub
+
+Sub OnKeyDown
+  key = GraphicsWindow.LastKey
+  ' set the direction enum
+  If (key = "Up") Then 
+    direction = up
+  ElseIf (key = "Down") Then 
+    direction = down
+  EndIf
+  
+  If (key = "Space") And (run = true) Then
+    ShootBullet()
+  EndIf
+  
+  If (key = "Escape") Then
+    Program.End()
+  EndIf
+EndSub
+
+' to make sure movement stops when you lift off the key
+Sub OnKeyUp
+  direction = -1
+EndSub
